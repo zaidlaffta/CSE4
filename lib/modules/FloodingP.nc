@@ -2,8 +2,8 @@
 #include "../../includes/packet.h"
 #include "../../includes/protocol.h"
 
-module FloodP {
-	provides interface Flood;
+module FloodingP {
+	provides interface Flooding;
 	uses interface SimpleSend as simpleSend;
 	uses interface Hashmap<uint32_t> as PreviousPackets;
 }
