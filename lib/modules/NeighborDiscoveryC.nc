@@ -1,21 +1,35 @@
-// Neighbor Discovery Config
-#define AM_NEIGHBOR 62
+#include "../../includes/neighbor.h"
+#define AM_NEIGHBOR 15
 
 configuration NeighborDiscoveryC{
-	provides interface NeighborDiscovery;
+    provides interface NeighborDiscovery;
 }
+
 implementation {
-	components NeighborDiscoveryP;
-	components new TimerMilliC() as beaconTimer;
-	components new SimpleSendC(AM_NEIGHBOR);
-	components new AMReceiverC(AM_NEIGHBOR);
+    components NeighborDiscoveryP;
+    NeighborDiscovery = NeighborDiscoveryP.NeighborDiscovery;
+    //NeighborDiscovery.neighborList = neighborListC;
+    
+    //100 is a random number I picked
+    components new ListC(pack, 100) as neighborList;
+    NeighborDiscoveryP.neighborList -> neighborList;
 
-	// external wiring
-	NeighborDiscovery = NeighborDiscoveryP.NeighborDiscovery;
+    components FloodingC;
+    NeighborDiscoveryP.Flooding -> FloodingC.Flooding;
 
-	// internal wiring
-	NeighborDiscoveryP.NeighborSender -> SimpleSendC;
-	NeighborDiscoveryP.MainReceive -> AMReceiverC;
-	NeighborDiscoveryP.beaconTimer -> beaconTimer;
-	
+    components new TimerMilliC() as periodicTimer;
+    NeighborDiscoveryP.periodicTimer -> periodicTimer;
+
+    components new TimerMilliC() as printTimer;
+    NeighborDiscoveryP.printTimer -> printTimer;
+
+    components new SimpleSendC(AM_NEIGHBOR);
+    NeighborDiscoveryP.Flooding -> SimpleSendC;
+
+    components new AMReceiverC(AM_NEIGHBOR);
+    NeighborDiscoveryP.neighborReceive -> AMReceiverC;
+
+    // components RandomC as random;
+    // NeighborDiscoveryP.random -> random;
+
 }

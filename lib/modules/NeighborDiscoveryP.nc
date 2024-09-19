@@ -1,150 +1,132 @@
-// Neighbor Discovery Module
+
 #include "../../includes/channels.h"
-#include "../../includes/protocol.h"
 #include "../../includes/packet.h"
-#include "../interfaces/aNeighbor.h"
-#define BEACON_PERIOD 9000
-#define NEIGHBORLIST_SIZE 255
-#define TIMEOUT_MAX 10
+#include "../../includes/neighbor.h"
 
 module NeighborDiscoveryP{
-	// uses interfaces
-	uses interface Timer<TMilli> as beaconTimer;
-	uses interface SimpleSend as NeighborSender;
-	uses interface Receive as MainReceive;
-	
-	//provides interfaces
-	provides interface NeighborDiscovery;	
+    uses interface Timer<TMilli> as periodicTimer;
+    uses interface Timer<TMilli> as printTimer;
+    uses interface SimpleSend as Flooding;
+    uses interface Receive as neighborReceive;
+    uses interface List<pack> as neighborList;
+    //uses interface Random as random;
+
+    provides interface NeighborDiscovery;
 }
+
 implementation {
+    pack sendPackage;
+    Neighbor neighborhood[100];
+    uint16_t index = 0;
+    void makePack(pack *Package, uint16_t src, uint16_t dest, uint16_t TTL, uint16_t Protocol, uint16_t seq, uint8_t *payload, uint8_t length);
+    void updateNeighbor();
+    //bool findNeighbor(pack* newMsg);
+    
 
+    command void NeighborDiscovery.start(){
+        //dbg(GENERAL_CHANNEL, "Started\n");
+        call periodicTimer.startOneShot(1000);
+    }
 
-	pack sendPackage;
-	void makePack(pack *Package, uint16_t src, uint16_t dest, uint16_t TTL, uint16_t protocol, uint16_t seq, uint8_t* payload, uint8_t length);
-			uint32_t globi;
+    command void NeighborDiscovery.startPrint(){
+        call printTimer.startOneShot(10000);
+    }
 
+    command void NeighborDiscovery.neighborReceived(uint16_t source){
+        uint16_t i = 0;
+        for (i = 0; i < 100; i++){
+            if (neighborhood[i].address == source){
+                neighborhood[i].age = 5;
+                return;
+            }
+            else {
+                neighborhood[index].address = source;
+                neighborhood[index].age = 5;
+                index++;
+                return;
+            }
+        }
+    }
 
-	uint16_t counter = 0;
-	struct aNeighbor Neighbors[NEIGHBORLIST_SIZE];
+    command void NeighborDiscovery.printNeighborhood(){
+        uint16_t i = 0;
+        for (i = 0; i < 100; i++){
+            if (neighborhood[i].address != 0){
+                dbg(NEIGHBOR_CHANNEL,"Neighbor: %u\n", neighborhood[i].address);
+            }
+        }
+    }
 
-	void updateNeighborList(uint16_t theSrc) {
-		uint32_t i;
-		
-		// if it is already in the list, refresh timeout
-		for (i = 0; i<NEIGHBORLIST_SIZE; i++) {
-			if (Neighbors[i].id == theSrc) {
-				Neighbors[i].TTL = TIMEOUT_MAX;
-				return;
-			}
-		}
-		
-		// otherwise, add to end of currently extant list
-			Neighbors[counter].id = theSrc;
-			Neighbors[counter].TTL = TIMEOUT_MAX;
-			counter++;
-		//	dbg(NEIGHBOR_CHANNEL, "!!!! Added to NeighborList: src%u \n", theSrc);
-		return;
-	}
-	
-	void refreshNeighborList() {
-		uint32_t i;
-		// first, go through all neighbors and decrement TTL
-		for (i = 0; i<NEIGHBORLIST_SIZE; i++) {
-			if (Neighbors[i].TTL > 1) {
-				Neighbors[i].TTL--;
-			}
-		}
-		
-		// NEXT, remove from list anyone who has hit TTL 1.
-		
-		for (i = 0; i<(NEIGHBORLIST_SIZE); i++) {
-			if (Neighbors[i].TTL == 1) {
-			uint32_t j;
-			for (j = i; j<(NEIGHBORLIST_SIZE-1); j++) {
-				Neighbors[j].id = Neighbors[j+1].id;
-				Neighbors[j].TTL = Neighbors[j+1].TTL;
-			}
-			// change end of list
-			Neighbors[NEIGHBORLIST_SIZE-1].id = 0;
-			Neighbors[NEIGHBORLIST_SIZE-1].TTL = 0;
-			//decrement counter
-			counter--;
-			}
-			
-			
-		}
-	}
-	
-	
-	command aNeighbor * NeighborDiscovery.getNeighborList(){
-		return Neighbors;
-	}
-	
-	command uint16_t NeighborDiscovery.getNeighborListSize() {
-		return counter;
-	}
-	
+    event void periodicTimer.fired(){
+        uint16_t i;
+        char* payload;
+        payload = "packet";
+        
+        makePack(&sendPackage, TOS_NODE_ID, AM_BROADCAST_ADDR, MAX_TTL, PROTOCOL_PING, 0, (uint8_t*) payload, PACKET_MAX_PAYLOAD_SIZE);
+        call Flooding.send(sendPackage, AM_BROADCAST_ADDR);
+        //updateNeighbor();
+        
+        for (i = 0; i < 100; i++){
+            if (neighborhood[i].age > 1){
+                neighborhood[i].age -1;
+            }
+        }
 
+        for (i = 0; i < 100; i++){
+            if (neighborhood[i].age == 1){
+                neighborhood[i].address = neighborhood[i++].address = 0;
+                neighborhood[i].age = neighborhood[i++].age = 0;
+                index--;
+            }
+        }
+    }
 
-	command void NeighborDiscovery.start(){
-		//one shot timer, include random element
-		dbg( NEIGHBOR_CHANNEL, "Initializing Neighbor Discovery\n");
-		call beaconTimer.startPeriodic(BEACON_PERIOD);
-	}
+    event message_t* neighborReceive.receive(message_t* message, void* payload, uint8_t len){
+        pack* newMsg = (pack*) payload;
 
-	command void NeighborDiscovery.print(){
-		dbg(NEIGHBOR_CHANNEL, "Printing neighbors of %u: \n", TOS_NODE_ID);
-		for (globi=0; globi<NEIGHBORLIST_SIZE; globi++) {
-			if (Neighbors[globi].id != 0) {
-				dbg(NEIGHBOR_CHANNEL, "%u, with TTL: %u\n", Neighbors[globi].id, Neighbors[globi].TTL);
-			}
-		}
-		
-	}
+        if (newMsg -> dest == AM_BROADCAST_ADDR){
+            newMsg -> dest == newMsg -> src;
+            newMsg -> src == TOS_NODE_ID;
+            newMsg -> protocol = PROTOCOL_PINGREPLY;
+            call Flooding.send(*newMsg, newMsg -> dest);
+        }
+        
+        if (newMsg -> dest == TOS_NODE_ID){
+            call NeighborDiscovery.neighborReceived(newMsg -> src);
+        }
+        return message;
+    }
 
-	event void beaconTimer.fired(){
-		//remove after debugging
-		//dbg(NEIGHBOR_CHANNEL, "beaconTimer fired\n");
+    event void printTimer.fired(){
+        call NeighborDiscovery.printNeighborhood();
+    }
 
-		// create and BROADCAST MESSAGE
-		
-		
-		makePack(&sendPackage, TOS_NODE_ID, AM_BROADCAST_ADDR, 0, 0, PROTOCOL_PING, "test", PACKET_MAX_PAYLOAD_SIZE);
-		
-		
-		
-		//dbg(NEIGHBOR_CHANNEL, "!!!! Flooding Network: %s\n", sendPackage.payload);
-		call NeighborSender.send(sendPackage, sendPackage.dest);
+    command Neighbor* NeighborDiscovery.getNeighborhood(){
+        return neighborhood;
+    }
 
-		// decrement time since last response
-		// if any time has hit 0, remove from neighbor list
-		refreshNeighborList();
-	}
+    command uint16_t NeighborDiscovery.neighborhoodSize(){
+        return index;
+    }
 
-	event message_t* MainReceive.receive(message_t* raw_msg, void* payload, uint8_t len){
-	
-		pack *msg = (pack *) payload;
-		// dbg(NEIGHBOR_CHANNEL, "!!!! Received! \n");
-		
-		// if the destination is AM_BROADCAST_ADDR, respond directly
-		if (msg->dest == AM_BROADCAST_ADDR) {
-			msg->dest = msg->src;
-			msg->src = TOS_NODE_ID;
-			msg->protocol = PROTOCOL_PINGREPLY;
-			call NeighborSender.send(*msg, msg->dest);
-		} else if (msg->dest == TOS_NODE_ID) {
-			//dbg(NEIGHBOR_CHANNEL, "!!!! Received back from %u! \n", msg->src);
-			updateNeighborList(msg->src);
-		}
-		
-		return raw_msg;
-	}
+    // void updateNeighbor(){
+    //     uint16_t i = 0;
+    //     for (i = 0; i < 100; i++){
+    //         if (neighborhood[i].age > 1){
+    //             neighborhood[i].age -1;
+    //         }
+    //     }
 
-	
-	
-	
-	
-	 void makePack(pack *Package, uint16_t src, uint16_t dest, uint16_t TTL, uint16_t protocol, uint16_t seq, uint8_t* payload, uint8_t length){
+    //     for (i = 0; i < 100; i++){
+    //         if (neighborhood[i].age == 1){
+    //             neighborhood[i].address = neighborhood[i++].address = 0;
+    //             neighborhood[i].age = neighborhood[i++].age = 0;
+    //             index--;
+    //         }
+    //     }
+    // }
+
+    void makePack(pack *Package, uint16_t src, uint16_t dest, uint16_t TTL, uint16_t protocol, uint16_t seq, uint8_t* payload, uint8_t length){
       Package->src = src;
       Package->dest = dest;
       Package->TTL = TTL;
@@ -152,9 +134,5 @@ implementation {
       Package->protocol = protocol;
       memcpy(Package->payload, payload, length);
    }
-	
-	
-	
-	
 
 }
