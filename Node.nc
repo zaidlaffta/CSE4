@@ -7,6 +7,7 @@
  *
  */
 #include <Timer.h>
+#include <string.h>
 #include "includes/command.h"
 #include "includes/packet.h"
 #include "includes/CommandMsg.h"
@@ -18,13 +19,18 @@ module Node{
 
    uses interface SplitControl as AMControl;
    uses interface Receive;
+   //uses interface Transport;
+   //uses interface TransportApp;
 
    uses interface SimpleSend as Sender;
-
    uses interface CommandHandler;
+   uses interface Flood as Flooding;
+   uses interface NeighborDiscovery as NeighborDiscovery;
+
+   
 }
 
-implementation{
+implementation {
    pack sendPackage;
 
    // Prototypes
@@ -34,6 +40,11 @@ implementation{
       call AMControl.start();
 
       dbg(GENERAL_CHANNEL, "Booted\n");
+
+      call NeighborDiscovery.start();
+      //call DistanceVectorRouting.start();
+      //call Transport.start();
+      call LinkStateRouting.start();      //proj4
    }
 
    event void AMControl.startDone(error_t err){
@@ -48,34 +59,66 @@ implementation{
    event void AMControl.stopDone(error_t err){}
 
    event message_t* Receive.receive(message_t* msg, void* payload, uint8_t len){
-      dbg(GENERAL_CHANNEL, "Packet Received\n");
       if(len==sizeof(pack)){
-         pack* myMsg=(pack*) payload;
-         dbg(GENERAL_CHANNEL, "Package Payload: %s\n", myMsg->payload);
+      	 pack* myMsg = (pack*) payload;
+      	 // Don't print messages from neighbor probe packets or DV packets or TCP packets
+      	 if( strcmp( (char*)(myMsg->payload), "NeighborProbing") && (myMsg->protocol) != PROTOCOL_DV && myMsg->protocol != PROTOCOL_TCP && myMsg->protocol != PROTOCOL_LS && myMsg->protocol != PROTOCOL_PING && myMsg->protocol != PROTOCOL_PINGREPLY) {
+      		dbg(GENERAL_CHANNEL, "Packet Received\n");
+      	 	//dbg(GENERAL_CHANNEL, "%d\n", myMsg -> protocol);
+            dbg(GENERAL_CHANNEL, "Package Payload: %s\n", myMsg->payload);
+      	 }
+         if(myMsg->protocol == PROTOCOL_DV) {
+         	//dbg(GENERAL_CHANNEL, "Distance Vector Protocol\n");
+           	//call DistanceVectorRouting.handleDV(myMsg);
+         }
+         else if (myMsg->dest == 0) {
+            //dbg(GENERAL_CHANNEL, "Neighbor Discovery called\n");
+      		call NeighborDiscovery.discover(myMsg);
+      	 }
+          else if(myMsg -> protocol == PROTOCOL_LS){
+            call LinkStateRouting.handleLS(myMsg);       //Proj 4 integration
+          }
+          else {
+            //dbg(GENERAL_CHANNEL, "Got Here\n");
+            call Flooding.Flood(myMsg);
+            
+          }
          return msg;
       }
+      // print these only when packet not recognized
+      dbg(GENERAL_CHANNEL, "Packet Received\n");
       dbg(GENERAL_CHANNEL, "Unknown Packet Type %d\n", len);
       return msg;
    }
 
 
    event void CommandHandler.ping(uint16_t destination, uint8_t *payload){
-      dbg(GENERAL_CHANNEL, "PING EVENT \n");
-      makePack(&sendPackage, TOS_NODE_ID, destination, 0, 0, 0, payload, PACKET_MAX_PAYLOAD_SIZE);
-      call Sender.send(sendPackage, destination);
+      //dbg(GENERAL_CHANNEL, "INITIATED ping\n");
+      call Flooding.ping(destination, payload);
+      
    }
 
-   event void CommandHandler.printNeighbors(){}
+   event void CommandHandler.printNeighbors(){
+   		//dbg(GENERAL_CHANNEL, "Should be Printing\n");
+   		call NeighborDiscovery.printNeighbors();
+   }
 
-   event void CommandHandler.printRouteTable(){}
+   event void CommandHandler.printRouteTable(){
+   }
 
-   event void CommandHandler.printLinkState(){}
+   event void CommandHandler.printLinkState(){                               //Proj 4 integrations
+      
+   }
 
-   event void CommandHandler.printDistanceVector(){}
+   event void CommandHandler.setTestServer(uint8_t port){
+   }
 
-   event void CommandHandler.setTestServer(){}
+   event void CommandHandler.setTestClient(uint8_t dest, uint8_t srcPort, uint8_t destPort, uint16_t transfer){
+   }
 
-   event void CommandHandler.setTestClient(){}
+   event void CommandHandler.setClientClose(uint8_t dest, uint8_t srcPort, uint8_t destPort) {
+        
+    }
 
    event void CommandHandler.setAppServer(){}
 
