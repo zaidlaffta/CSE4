@@ -42,9 +42,7 @@ implementation {
       dbg(GENERAL_CHANNEL, "Booted\n");
 
       call NeighborDiscovery.start();
-      //call DistanceVectorRouting.start();
-      //call Transport.start();
-      call LinkStateRouting.start();      //proj4
+      
    }
 
    event void AMControl.startDone(error_t err){
@@ -75,9 +73,7 @@ implementation {
             //dbg(GENERAL_CHANNEL, "Neighbor Discovery called\n");
       		call NeighborDiscovery.discover(myMsg);
       	 }
-          else if(myMsg -> protocol == PROTOCOL_LS){
-            call LinkStateRouting.handleLS(myMsg);       //Proj 4 integration
-          }
+         
           else {
             //dbg(GENERAL_CHANNEL, "Got Here\n");
             call Flooding.Flood(myMsg);
