@@ -31,7 +31,7 @@ implementation {
     components CommandHandlerC;
     Node.CommandHandler -> CommandHandlerC;
 
-    components FloodingC;
+    components FloodC;
     Node.Flood -> FloodC;
 
     components NeighborDiscoveryC;

@@ -13,7 +13,6 @@ module NeighborDiscoveryP {
     uses interface Hashmap<uint32_t> as NeighborTable;
     uses interface SimpleSend as Sender;
 
-    uses interface LinkStateRouting as LinkStateRouting;            //added for Project 4
 
 }
 implementation {
@@ -41,8 +40,8 @@ implementation {
             dbg(NEIGHBOR_CHANNEL, "PING REPLY Neighbor Discovery, Confirmed neighbor %d\n", packet->src);
             if(!call NeighborTable.contains(packet->src)) {
                 call NeighborTable.insert(packet->src, NODETIMETOLIVE);  //Project 4 implementation
-              //call DistanceVectorRouting.handleNeighborFound();
-                call LinkStateRouting.handleNeighborFound();
+
+
             }
             else {call NeighborTable.insert(packet->src, NODETIMETOLIVE);}
         }
@@ -63,8 +62,8 @@ implementation {
             if(neighbors[i]==0) {continue;}
             if (call NeighborTable.get(neighbors[i]) == 0) {
                 dbg(NEIGHBOR_CHANNEL, "Deleted Neighbor %d\n", neighbors[i]);
-                call NeighborTable.remove(neighbors[i]);
-                call LinkStateRouting.handleNeighborLost(neighbors[i]);          //PArt of PRoject 4 implemnetation
+
+
             }
             else {
                 call NeighborTable.insert(neighbors[i], call NeighborTable.get(neighbors[i])-1);
