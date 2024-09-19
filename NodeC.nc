@@ -32,7 +32,7 @@ implementation {
     Node.CommandHandler -> CommandHandlerC;
 
     components FloodingC;
-    Node.Flooding -> FloodingC;
+    Node.Flooding -> FloodC;
 
     components NeighborDiscoveryC;
     Node.NeighborDiscovery -> NeighborDiscoveryC;
