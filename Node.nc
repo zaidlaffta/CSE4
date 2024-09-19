@@ -102,23 +102,15 @@ implementation {
    		//dbg(GENERAL_CHANNEL, "Should be Printing\n");
    		call NeighborDiscovery.printNeighbors();
    }
+   event void CommandHandler.printRouteTable(){}
 
-   event void CommandHandler.printRouteTable(){
-   }
+   event void CommandHandler.printLinkState(){}
 
-   event void CommandHandler.printLinkState(){                               //Proj 4 integrations
-      
-   }
+   event void CommandHandler.printDistanceVector(){}
 
-   event void CommandHandler.setTestServer(uint8_t port){
-   }
+   event void CommandHandler.setTestServer(){}
 
-   event void CommandHandler.setTestClient(uint8_t dest, uint8_t srcPort, uint8_t destPort, uint16_t transfer){
-   }
-
-   event void CommandHandler.setClientClose(uint8_t dest, uint8_t srcPort, uint8_t destPort) {
-        
-    }
+   event void CommandHandler.setTestClient(){}
 
    event void CommandHandler.setAppServer(){}
 
